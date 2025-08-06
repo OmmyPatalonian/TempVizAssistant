@@ -1,0 +1,22 @@
+{
+  "dataset": {
+    "name": "MIMIC-CXR",
+    "data_dir": "path/to/mimic-cxr-2.0.0",
+    "processed_dir": "path/to/mimic-cxr-2.0.0/processed",
+    "image_dir": "path/to/mimic-cxr-2.0.0/files"
+  },
+  "training": {
+    "batch_size": 4,
+    "max_length": 512,
+    "image_size": [
+      224,
+      224
+    ],
+    "learning_rate": 0.0001
+  },
+  "template": {
+    "type": "radiology",
+    "image_token": "<image>",
+    "system_prompt": "You are an expert radiologist analyzing chest X-rays."
+  }
+}
