@@ -1,33 +1,32 @@
 """
-Prompt Template Layer
-Responsibility: Converting structured chat messages into formatted prompt strings
+Template stuff for converting chat to prompts
 """
 from typing import List, Dict, Any, Optional
 from abc import ABC, abstractmethod
 
 
 class ChatMessage:
-    """Represents a single message in a conversation"""
+    #basic message class
     def __init__(self, role: str, content: str, content_type: str = "text"):
         self.role = role
         self.content = content
-        self.content_type = content_type  # "text" or "image"
+        self.content_type = content_type  #text or image
     
     def __repr__(self):
         return f"ChatMessage(role={self.role}, content_type={self.content_type})"
 
 
 class PromptTemplate(ABC):
-    """Abstract base class for prompt templates"""
+    # base template class
     
     @abstractmethod
     def render(self, messages: List[ChatMessage]) -> str:
-        """Convert list of messages into a formatted prompt string"""
+        #turn messages into prompt string
         pass
 
 
 class RadiologyTemplate(PromptTemplate):
-    """Template specifically designed for radiology CT report generation"""
+    #for medical imaging stuff
     
     def __init__(self, image_token: str = "<image>"):
         self.image_token = image_token
@@ -38,19 +37,13 @@ class RadiologyTemplate(PromptTemplate):
         )
     
     def render(self, messages: List[ChatMessage]) -> str:
-        """
-        Renders messages into the format:
-        SYSTEM: {system_prompt}
-        USER: {findings_text}
-        USER: {image_token}
-        ASSISTANT: 
-        """
+        # format: SYSTEM -> USER -> USER (image) -> ASSISTANT
         prompt_parts = []
         
-        # Always start with system message
+        # system message first
         prompt_parts.append(f"SYSTEM: {self.system_prompt}")
         
-        # Process user messages
+        #process messages
         for message in messages:
             if message.role == "user":
                 if message.content_type == "text":
@@ -60,7 +53,7 @@ class RadiologyTemplate(PromptTemplate):
             elif message.role == "assistant":
                 prompt_parts.append(f"ASSISTANT: {message.content}")
         
-        # Add assistant prompt if not already present
+        # add assistant prompt if needed
         if not any(msg.role == "assistant" for msg in messages):
             prompt_parts.append("ASSISTANT:")
         
@@ -68,7 +61,7 @@ class RadiologyTemplate(PromptTemplate):
 
 
 class LLaVAStyleTemplate(PromptTemplate):
-    """Template that mimics LLaVA's conversation format"""
+    #llava format template
     
     def __init__(self, image_token: str = "<image>", 
                  system_prompt: Optional[str] = None):
@@ -79,11 +72,7 @@ class LLaVAStyleTemplate(PromptTemplate):
         )
     
     def render(self, messages: List[ChatMessage]) -> str:
-        """
-        Renders in LLaVA v1 style:
-        {system_prompt}
-        USER: {content} ASSISTANT: {response}
-        """
+        # llava v1 format
         prompt_parts = [self.system_prompt]
         
         current_exchange = []
@@ -98,7 +87,7 @@ class LLaVAStyleTemplate(PromptTemplate):
                 prompt_parts.append(f"USER: {user_content} ASSISTANT: {message.content}")
                 current_exchange = []
         
-        # Handle case where there's no assistant response yet
+        #handle no response case
         if current_exchange:
             user_content = " ".join(current_exchange)
             prompt_parts.append(f"USER: {user_content} ASSISTANT:")
@@ -107,7 +96,7 @@ class LLaVAStyleTemplate(PromptTemplate):
 
 
 class SimpleTemplate(PromptTemplate):
-    """Simple, customizable template"""
+    # customizable template
     
     def __init__(self, 
                  system_prompt: str,
@@ -134,9 +123,8 @@ class SimpleTemplate(PromptTemplate):
         return self.separator.join(prompt_parts)
 
 
-# Factory function for easy template selection
+#factory function 
 def create_template(template_type: str = "radiology", **kwargs) -> PromptTemplate:
-    """Factory function to create different template types"""
     if template_type == "radiology":
         return RadiologyTemplate(**kwargs)
     elif template_type == "llava":
@@ -148,7 +136,7 @@ def create_template(template_type: str = "radiology", **kwargs) -> PromptTemplat
 
 
 if __name__ == "__main__":
-    # Example usage
+    # quick test
     template = RadiologyTemplate()
     
     messages = [
@@ -161,7 +149,7 @@ if __name__ == "__main__":
     print(prompt)
     print()
     
-    # Example with response
+    #with response
     messages_with_response = messages + [
         ChatMessage("assistant", "Impression: Bilateral pneumonia with characteristic air bronchograms.")
     ]

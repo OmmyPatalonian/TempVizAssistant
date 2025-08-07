@@ -1,7 +1,5 @@
 """
-Collation Layer
-Responsibility: Taking batches of raw examples, rendering them through templates,
-and tokenizing everything into model-ready tensors.
+Collation stuff for batching and tokenizing examples
 """
 import torch
 from torch.utils.data import DataLoader
@@ -9,78 +7,60 @@ from typing import List, Dict, Any, Optional, Union, Callable
 from transformers import AutoTokenizer, AutoProcessor
 from PIL import Image
 
-from template import PromptTemplate, ChatMessage
-from dataset import CTReportExample
+from .template import PromptTemplate, ChatMessage
+from .dataset import CTReportExample
 
 
 class MultimodalCollator:
-    """
-    Collator that handles text templating, tokenization, and image processing
-    for multimodal models like LLaVA or MedGemma.
-    """
+    #handles text templating, tokenization, and image processing
     
     def __init__(self,
-                 processor: Any,  # HuggingFace processor (handles both text and images)
+                 processor: Any,  # HF processor 
                  template: PromptTemplate,
                  max_length: int = 2048,
                  image_token: str = "<image>",
                  ignore_index: int = -100):
-        """
-        Args:
-            processor: HuggingFace processor that handles tokenization and image processing
-            template: Template for rendering chat messages into prompts
-            max_length: Maximum sequence length
-            image_token: Token used as placeholder for images in text
-            ignore_index: Index to ignore in loss computation (for padding tokens)
-        """
         self.processor = processor
         self.template = template
         self.max_length = max_length
         self.image_token = image_token
         self.ignore_index = ignore_index
         
-        # Get tokenizer from processor if available
+        #get tokenizer from processor
         self.tokenizer = getattr(processor, 'tokenizer', processor)
     
     def __call__(self, batch: List[CTReportExample]) -> Dict[str, torch.Tensor]:
-        """
-        Collate a batch of examples into model inputs.
+        #collate batch of examples into model inputs
         
-        Args:
-            batch: List of CTReportExample objects
-            
-        Returns:
-            Dictionary with keys: pixel_values, input_ids, attention_mask, labels
-        """
-        # Separate prompts and labels
+        # separate prompts and labels
         prompt_messages = []
         label_texts = []
         images = []
         
         for example in batch:
-            # Get messages without the assistant response for prompt
+            #get messages without assistant response for prompt
             messages_for_prompt = example.to_messages(include_response=False)
             prompt_messages.append(messages_for_prompt)
             
-            # Get the ground truth impression for labels
+            # get ground truth impression for labels
             label_texts.append(f"Impression: {example.impression}")
             
-            # Collect images
+            #collect images
             images.append(example.image)
         
-        # Render prompts using template
+        #render prompts using template
         prompts = []
         for messages in prompt_messages:
             prompt_text = self.template.render(messages)
             prompts.append(prompt_text)
         
-        # Process images and text together
+        # process images and text together
         model_inputs = self._process_inputs(prompts, images)
         
-        # Process labels separately
+        #process labels separately
         labels = self._process_labels(label_texts)
         
-        # Add labels to model inputs
+        # add labels to model inputs
         model_inputs["labels"] = labels
         
         return model_inputs
@@ -216,13 +196,13 @@ class SimpleCollator:
 
 
 class DebugCollator:
-    """Collator that prints debug information"""
+    #collator that prints debug info
     
     def __init__(self, base_collator):
         self.base_collator = base_collator
     
     def __call__(self, batch):
-        print(f"\n=== Collating batch of {len(batch)} examples ===")
+        print(f"\nCollating batch of {len(batch)} examples")
         
         for i, example in enumerate(batch):
             print(f"\nExample {i}:")
@@ -231,7 +211,7 @@ class DebugCollator:
             print(f"  Impression: {example.impression[:100]}...")
             print(f"  Image size: {example.image.size}")
         
-        # Call the base collator
+        # call base collator
         result = self.base_collator(batch)
         
         print(f"\nCollated result shapes:")
@@ -241,7 +221,7 @@ class DebugCollator:
             else:
                 print(f"  {key}: {type(value)}")
         
-        print("=== End batch ===\n")
+        print("End batch\n")
         
         return result
 

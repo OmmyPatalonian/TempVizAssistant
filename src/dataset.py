@@ -1,7 +1,5 @@
 """
-Dataset Layer
-Responsibility: Reading CT annotations and images from disk, packaging them into 
-structured chat data that the template layer can consume.
+Dataset stuff for loading medical images and reports
 """
 import json
 import os
@@ -11,11 +9,11 @@ from PIL import Image
 import torch
 from torch.utils.data import Dataset
 
-from template import ChatMessage
+from .template import ChatMessage
 
 
 class CTReportExample:
-    """Represents a single CT report example with image and text"""
+    #single example with image and text
     
     def __init__(self, 
                  example_id: str,
@@ -31,16 +29,16 @@ class CTReportExample:
     
     @property
     def image(self) -> Image.Image:
-        """Lazy load the image when accessed"""
+        #lazy load image
         if self._image is None:
             self._image = Image.open(self.image_path).convert('RGB')
         return self._image
     
     def to_messages(self, include_response: bool = True) -> List[ChatMessage]:
-        """Convert to list of ChatMessage objects"""
+        #convert to chat messages
         messages = [
             ChatMessage("user", f"Findings: {self.findings}"),
-            ChatMessage("user", "", "image"),  # Image placeholder
+            ChatMessage("user", "", "image"),  #image placeholder
         ]
         
         if include_response:
@@ -53,38 +51,29 @@ class CTReportExample:
 
 
 class CTReportDataset(Dataset):
-    """Dataset for medical reports with findings and impressions (works with CT, CXR, etc.)"""
+    #dataset for medical reports 
     
     def __init__(self, 
                  json_path: str,
                  image_folder: str,
-                 load_images: bool = False,
-                 is_mimic: bool = False):
-        """
-        Args:
-            json_path: Path to JSON file with annotations
-            image_folder: Path to folder containing images  
-            load_images: Whether to preload images (memory intensive)
-            is_mimic: Whether this is MIMIC-CXR dataset (affects path handling)
-        """
+                 load_images: bool = False):
         self.json_path = Path(json_path)
         self.image_folder = Path(image_folder)
         self.load_images = load_images
-        self.is_mimic = is_mimic
         
-        # Load the JSON data
+        # load json data
         with open(self.json_path, 'r') as f:
             self.data = json.load(f)
         
-        # Validate the data structure
+        #validate structure
         self._validate_data()
         
-        # Optionally preload images
+        # preload images if needed
         if self.load_images:
             self._preload_images()
     
     def _validate_data(self):
-        """Validate that the JSON has the required structure"""
+        #check json has required fields
         if not isinstance(self.data, list):
             raise ValueError("JSON should contain a list of examples")
         
@@ -95,7 +84,7 @@ class CTReportDataset(Dataset):
                 raise ValueError(f"Item {i} missing required fields: {missing_fields}")
     
     def _preload_images(self):
-        """Preload all images into memory"""
+        #load all images to memory
         print(f"Preloading {len(self.data)} images...")
         for item in self.data:
             image_path = self.image_folder / item["image"]
@@ -106,18 +95,13 @@ class CTReportDataset(Dataset):
         return len(self.data)
     
     def __getitem__(self, idx: int) -> CTReportExample:
-        """Get a single example"""
+        #get single example
         item = self.data[idx]
         
-        # Handle different image path formats
-        if self.is_mimic:
-            # MIMIC-CXR has full relative paths in the JSON
-            image_path = self.image_folder / item["image"]
-        else:
-            # Regular format expects just filename
-            image_path = self.image_folder / item["image"]
+        # build image path
+        image_path = self.image_folder / item["image"]
         
-        # Use preloaded image if available
+        #use preloaded image if available
         image = item.get("_preloaded_image", None)
         
         return CTReportExample(
@@ -129,12 +113,12 @@ class CTReportDataset(Dataset):
         )
     
     def get_messages(self, idx: int, include_response: bool = True) -> List[ChatMessage]:
-        """Get ChatMessage list for a specific example"""
+        #get messages for specific example
         example = self[idx]
         return example.to_messages(include_response=include_response)
     
     def get_batch_messages(self, indices: List[int], include_response: bool = True) -> List[List[ChatMessage]]:
-        """Get ChatMessage lists for a batch of examples"""
+        # get messages for batch of examples
         return [self.get_messages(idx, include_response) for idx in indices]
 
 
